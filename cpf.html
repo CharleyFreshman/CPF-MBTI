@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> 客观 MBTI 性格测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; text-align: center; }
+        .question {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        .question p { margin: 0 0 10px 0; font-weight: bold; }
+        .question label { margin-right: 20px; cursor: pointer; }
+        .note {
+            margin: 20px 0;
+            padding: 12px 15px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 5px;
+            color: #664d03;
+            font-size: 14px;
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 15px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .btn-submit:hover { background: #45a049; }
+        .btn-submit:disabled { background: #cccccc; cursor: not-allowed; }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: var(--theme-bg, #e8f5e9);
+            border-radius: 5px;
+            display: none;
+        }
+        .result.show { display: block; }
+        .loading { text-align: center; color: #666; display: none; }
+        .loading.show { display: block; }
+        .model-details {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            font-size: 14px;
+            display: none;
+        }
+        .model-details.show { display: block; }
+        .mbti-big {
+            font-size: 56px;
+            font-weight: bold;
+            color: var(--theme-text, #4CAF50);
+            letter-spacing: 6px;
+        }
+        .axis-card {
+            margin: 8px 0;
+            padding: 10px;
+            background: #fff;
+            border-radius: 5px;
+            border-left: 4px solid var(--theme-accent, #4CAF50);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 客观 MBTI 性格测试</h1>
+        <p style="text-align: center; color: #666;">基于CPF心理学模型，探索成长环境与性格的关联。数据仅存本地，请放心作答。</p>
+
+        <form id="surveyForm">
+            <div id="questions"></div>
+            <button type="submit" class="btn-submit" id="submitBtn">查看结果</button>
+        </form>
+
+        <div class="loading" id="loading">⏳ 正在分析中...</div>
+
+        <div class="result" id="result">
+            <h2> 测试结果 (仅供参考) </h2>
+            <div id="resultContent"></div>
+            <button onclick="toggleDetails()" style="margin-top:10px;">查看详细分析</button>
+            <div class="model-details" id="details"></div>
+        </div>
+    </div>
+
+    <script src="mbti_models.js"></script>
+    <script src="mbti_predict.js"></script>
+    <script>
+        const BOOKS_ENCODE = [0, 0.5, 1, 2, 4];
+        function buildFeatures(d) {
+            const common = [
+                d.gender, d.age, d.city_tier * d.area_type, d.material,
+                BOOKS_ENCODE[d.books], d.guardian_edu, d.culture_req, d.life_skill_req,
+            ];
+            const tail = [d.life_satisfaction, d.life_meaning, d.education, d.peer_recognition,
+                d.family_satisfaction, d.friendship_satisfaction, d.love_satisfaction];
+            if (d.single_parent === 1) {
+                return common.concat([1, d.guardian_a_ie, d.guardian_a_ft]).concat(tail);
+            }
+            return common.concat([d.guardian_a_ie, d.guardian_a_ft, d.guardian_b_ie || 0, d.guardian_b_ft || 0]).concat(tail);
+        }
+
+        const questions = [
+            { key: 'gender', text: '你的性别', options: [['女', 0], ['男', 1]] },
+            { key: 'age', text: '你的年龄', type: 'number', min: 18, max: 35 },
+            { key: 'city_tier', text: '18岁前常住地经济层级', options: [
+                ['经济落后地区', 1], ['较弱地级市', 2], ['中等二线/发达地级市', 3],
+                ['强二线/省会发达城市', 4], ['一线/顶级发达城市', 5]
+            ]},
+            { key: 'area_type', text: '18岁前你常住的区域', options: [
+                ['农村/偏远地区', 1], ['县城/乡镇', 2], ['市区/市中心', 3]
+            ]},
+            { key: 'material', text: '18岁前物质生活条件（参照初/高中同学）', options: [
+                ['经常缺乏必需品', 1], ['偶尔缺乏且无富余', 2], ['基本满足但富余少', 3],
+                ['满足且富余较多', 4], ['富裕且文娱支出多', 5]
+            ]},
+            { key: 'books', text: '家中藏书总量（不含课本教材）', options: [
+                ['0-50本', 0], ['50-100本', 1], ['100-200本', 2], ['200-400本', 3], ['400本以上', 4]
+            ]},
+            { key: 'guardian_edu', text: '父母/监护人最高学历', options: [
+                ['小学及以下', 1], ['初中', 2], ['高中', 3], ['中专', 4],
+                ['大专', 5], ['本科', 6], ['研究生及以上', 7]
+            ]},
+            { key: 'life_skill_req', text: '监护人对你生活技能的要求', options: [
+                ['低', 1], ['较低', 2], ['中', 3], ['较高', 4], ['高', 5]
+            ]},
+            { key: 'culture_req', text: '监护人对你文化知识的要求', options: [
+                ['低', 1], ['较低', 2], ['中', 3], ['较高', 4], ['高', 5]
+            ]},
+            { key: 'single_parent', text: '是否单亲家庭', options: [['否', 0], ['是', 1]] },
+            { type: 'note', text: '📋 以下监护人按重要程度排序：A为主要监护人，B为次要监护人' },
+            { key: 'guardian_a_ie', text: '监护人A 性格倾向', options: [['内向', 0], ['外向', 1]] },
+            { key: 'guardian_a_ft', text: '监护人A 决策倾向', options: [['感性', 0], ['理性', 1]] },
+            { key: 'guardian_b_ie', text: '监护人B 性格倾向', showIf: { key: 'single_parent', val: 0 }, options: [['内向', 0], ['外向', 1]] },
+            { key: 'guardian_b_ft', text: '监护人B 决策倾向', showIf: { key: 'single_parent', val: 0 }, options: [['感性', 0], ['理性', 1]] },
+            { key: 'life_satisfaction', text: '过去半年生活满意度', options: [
+                ['很不满意', 1], ['不满意', 2], ['基本满意', 3], ['满意', 4], ['非常满意', 5]
+            ]},
+            { key: 'life_meaning', text: '人生意义明确程度', options: [
+                ['非常迷茫', 1], ['迷茫', 2], ['若隐若现', 3], ['明确', 4], ['非常明确', 5]
+            ]},
+            { key: 'education', text: '你的最高学历（第一学历）', options: [
+                ['中专/职高', 1], ['大专/高职', 2], ['民办本科', 3], ['公办普通本科', 4],
+                ['潜力大学(普通211/新晋双一流)', 5], ['重点大学(普通985/顶流211)', 6],
+                ['顶尖大学(顶流985/C9/QS前100)', 7]
+            ]},
+            { key: 'peer_recognition', text: '同学/同事对你的认可度', options: [
+                ['很不认可', 1], ['不认可', 2], ['基本认可', 3], ['认可', 4], ['非常认可', 5]
+            ]},
+            { key: 'family_satisfaction', text: '亲情满意度', options: [
+                ['很不满意', 1], ['不满意', 2], ['基本满意', 3], ['满意', 4], ['非常满意', 5]
+            ]},
+            { key: 'friendship_satisfaction', text: '友情满意度', options: [
+                ['很不满意', 1], ['不满意', 2], ['基本满意', 3], ['满意', 4], ['非常满意', 5]
+            ]},
+            { key: 'love_satisfaction', text: '爱情满意度', options: [
+                ['很不满意', 1], ['不满意', 2], ['基本满意', 3], ['满意', 4], ['非常满意', 5]
+            ]},
+        ];
+
+        function renderQuestions() {
+            const container = document.getElementById('questions');
+            let n = 0;
+            questions.forEach(q => {
+                const div = document.createElement('div');
+                const isNote = q.type === 'note';
+                div.className = isNote ? 'note' : 'question';
+                if (q.key) div.id = `qrow_${q.key}`;
+                let inner;
+                if (isNote) {
+                    inner = q.text;
+                } else {
+                    inner = `<p>${++n}. ${q.text}</p>`;
+                    if (q.type === 'number') {
+                        inner += `<input type="number" name="${q.key}" min="${q.min}" max="${q.max}" value="${q.min}" style="padding:8px;font-size:16px;width:120px;">`;
+                    } else {
+                        inner += q.options.map(([label, val]) =>
+                            `<label><input type="radio" name="${q.key}" value="${val}"> ${label}</label>`
+                        ).join('');
+                    }
+                }
+                div.innerHTML = inner;
+                if (q.showIf) div.style.display = 'none';
+                container.appendChild(div);
+            });
+            const triggers = [...new Set(questions.filter(q => q.showIf).map(q => q.showIf.key))];
+            triggers.forEach(k => {
+                document.querySelectorAll(`input[name="${k}"]`).forEach(r =>
+                    r.addEventListener('change', updateVisibility));
+            });
+            updateVisibility();
+        }
+
+        function updateVisibility() {
+            questions.forEach(q => {
+                if (!q.showIf) return;
+                const el = document.getElementById(`qrow_${q.key}`);
+                if (!el) return;
+                const checked = document.querySelector(`input[name="${q.showIf.key}"]:checked`);
+                const show = checked && String(checked.value) === String(q.showIf.val);
+                el.style.display = show ? '' : 'none';
+                if (!show) {
+                    const c = el.querySelector('input:checked');
+                    if (c) c.checked = false;
+                }
+            });
+        }
+
+        document.getElementById('surveyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const resultDiv = document.getElementById('result');
+
+            submitBtn.disabled = true;
+            loading.classList.add('show');
+            resultDiv.classList.remove('show');
+
+            const data = {};
+            for (const q of questions) {
+                if (!q.key) continue;
+                if (q.showIf && String(data[q.showIf.key]) !== String(q.showIf.val)) continue;
+                let val = null;
+                if (q.type === 'number') {
+                    const el = e.target.querySelector(`input[name="${q.key}"]`);
+                    if (el && el.value !== '') val = Number(el.value);
+                } else {
+                    const checked = e.target.querySelector(`input[name="${q.key}"]:checked`);
+                    if (checked) val = Number(checked.value);
+                }
+                if (val !== null) data[q.key] = val;
+            }
+
+            const required = questions.filter(q => q.key &&
+                (!q.showIf || String(data[q.showIf.key]) === String(q.showIf.val))).length;
+            if (Object.keys(data).length < required) {
+                alert(`请回答所有 ${required} 个问题`);
+                submitBtn.disabled = false;
+                loading.classList.remove('show');
+                return;
+            }
+
+            try {
+                const features = buildFeatures(data);
+                const result = predictMBTI(features, data.single_parent === 1);
+                displayResults(result);
+            } catch (error) {
+                console.error('Error:', error);
+                alert('推理失败: ' + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                loading.classList.remove('show');
+            }
+        });
+
+        function getTheme(mbtiType) {
+            const t = (mbtiType || '').toUpperCase();
+            const n = t.includes('N'), s = t.includes('S'), f = t.includes('F'), p = t.includes('P');
+            if (n && f) return { bg: '#e8f5e9', accent: '#4CAF50', text: '#1b5e20' };
+            if (s && p) return { bg: '#fff9c4', accent: '#fbc02d', text: '#6d4c41' };
+            if (n && t.includes('T')) return { bg: '#f3e5f5', accent: '#8e24aa', text: '#4a148c' };
+            if (s && t.includes('J')) return { bg: '#e3f2fd', accent: '#1976d2', text: '#0d47a1' };
+            return { bg: '#e8f5e9', accent: '#4CAF50', text: '#1b5e20' };
+        }
+
+        function displayResults(result) {
+            const resultDiv = document.getElementById('result');
+            const content = document.getElementById('resultContent');
+            const details = document.getElementById('details');
+            const preds = result.predictions || {};
+            const axes = [
+                { key: 'I/E', left: ['I', '内倾'], right: ['E', '外倾'] },
+                { key: 'N/S', left: ['S', '实感'], right: ['N', '直觉'] },
+                { key: 'F/T', left: ['F', '情感'], right: ['T', '思考'] },
+                { key: 'P/J', left: ['P', '感知'], right: ['J', '判断'] }
+            ];
+            const modelTag = result.model === 'single_parent' ? 'Ⅰ' : 'Ⅱ';
+            const theme = getTheme(result.mbti_type);
+            resultDiv.style.setProperty('--theme-bg', theme.bg);
+            resultDiv.style.setProperty('--theme-accent', theme.accent);
+            resultDiv.style.setProperty('--theme-text', theme.text);
+
+            let html = `<div style="text-align:center;margin:10px 0;">
+                <div class="mbti-big">${result.mbti_type || ''}</div>
+                <div style="color:#666;">MBTI 类型 · 总体置信度 ${(result.confidence * 100).toFixed(1)}%</div>
+            </div>`;
+
+            axes.forEach(ax => {
+                const p = preds[ax.key];
+                if (!p) return;
+                html += `<div class="axis-card">
+                    <strong>${ax.key}</strong><span style="float:right;font-size:20px;font-weight:bold;color:${theme.text};">${p.type}</span><br>
+                    <span style="font-size:13px;color:#666;">${p.type} : ${(p.confidence * 100).toFixed(1)}%</span>
+                </div>`;
+            });
+            content.innerHTML = html;
+
+            if (result.detailed) {
+                let dh = `<h4>各模型详细预测· ${modelTag} </h4>`;
+                Object.entries(result.detailed).forEach(([ax, d]) => {
+                    dh += `<div style="margin:8px 0;padding:10px;background:#fff;border:1px solid #ddd;border-radius:5px;">
+                        <strong>${ax}</strong> → 加权得分 ${(d.ensemble_probability * 100).toFixed(1)}<br>`;
+                    Object.entries(d.model_predictions).forEach(([m, prob]) => {
+                        dh += `<span style="font-size:12px;display:inline-block;margin:2px 5px;padding:2px 8px;background:#f0f0f0;border-radius:3px;">
+                            ${m}: ${(prob * 100).toFixed(1)} (权重 ${(d.model_weights[m] * 100).toFixed(1)}%)
+                        </span>`;
+                    });
+                    dh += '</div>';
+                });
+                details.innerHTML = dh;
+            }
+
+            resultDiv.classList.add('show');
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function toggleDetails() {
+            document.getElementById('details').classList.toggle('show');
+        }
+
+        renderQuestions();
+    </script>
+</body>
+</html>
