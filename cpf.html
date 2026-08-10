@@ -313,10 +313,14 @@
                     <span style="font-size:13px;color:#666;">${p.type} : ${(p.confidence * 100).toFixed(1)}%</span>
                 </div>`;
             });
+            html += `<div style="margin-top:14px;font-size:13px;color:#888;">
+                📝 若愿助我们丰富实验数据，可<a href="https://v.wjx.cn/vm/r1EUUdm.aspx#" target="_blank" style="color:#666;">填写简短问卷</a>（选填）
+            </div>`;
             content.innerHTML = html;
 
             if (result.detailed) {
                 let dh = `<h4>各模型详细预测· ${modelTag} </h4>`;
+
                 Object.entries(result.detailed).forEach(([ax, d]) => {
                     dh += `<div style="margin:8px 0;padding:10px;background:#fff;border:1px solid #ddd;border-radius:5px;">
                         <strong>${ax}</strong> → 加权得分 ${(d.ensemble_probability * 100).toFixed(1)}<br>`;
@@ -327,9 +331,7 @@
                     });
                     dh += '</div>';
                 });
-                dh += `<div style="margin-top:14px;padding-top:10px;border-top:1px dashed #ddd;font-size:13px;color:#888;">
-                    若您愿意帮助完善模型，可填写简短问卷 <a href="https://v.wjx.cn/vm/r1EUUdm.aspx#" target="_blank" style="color:#666;"></a>
-                </div>`;
+            
                 details.innerHTML = dh;
             }
 
