@@ -85,7 +85,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🧠 客观 MBTI 性格测试</h1>
+        <h1>🧠客观 MBTI 性格测试</h1>
         <p style="text-align: center; color: #666;">基于CPF心理学模型，探索成长环境与性格的关联。数据仅存本地，请放心作答。</p>
 
         <form id="surveyForm">
@@ -123,14 +123,14 @@
         const questions = [
             { key: 'gender', text: '你的性别', options: [['女', 0], ['男', 1]] },
             { key: 'age', text: '你的年龄', type: 'number', min: 18, max: 35 },
-            { key: 'city_tier', text: '18岁前常住地经济层级', options: [
+            { key: 'city_tier', text: '18岁前常住地经济', options: [
                 ['经济落后地区', 1], ['较弱地级市', 2], ['中等二线/发达地级市', 3],
                 ['强二线/省会发达城市', 4], ['一线/顶级发达城市', 5]
             ]},
             { key: 'area_type', text: '18岁前你常住的区域', options: [
                 ['农村/偏远地区', 1], ['县城/乡镇', 2], ['市区/市中心', 3]
             ]},
-            { key: 'material', text: '18岁前物质生活条件（参照初/高中同学）', options: [
+            { key: 'material', text: '18岁前物质生活条件（参照初中同学）', options: [
                 ['经常缺乏必需品', 1], ['偶尔缺乏且无富余', 2], ['基本满足但富余少', 3],
                 ['满足且富余较多', 4], ['富裕且文娱支出多', 5]
             ]},
@@ -148,18 +148,18 @@
                 ['低', 1], ['较低', 2], ['中', 3], ['较高', 4], ['高', 5]
             ]},
             { key: 'single_parent', text: '是否单亲家庭', options: [['否', 0], ['是', 1]] },
-            { type: 'note', text: '📋 以下监护人按重要程度排序：A为主要监护人，B为次要监护人' },
+            { type: 'note', text: '📋监护人按重要程度排序：A为主要监护人，B为次要监护人' },
             { key: 'guardian_a_ie', text: '监护人A 性格倾向', options: [['内向', 0], ['外向', 1]] },
             { key: 'guardian_a_ft', text: '监护人A 决策倾向', options: [['感性', 0], ['理性', 1]] },
             { key: 'guardian_b_ie', text: '监护人B 性格倾向', showIf: { key: 'single_parent', val: 0 }, options: [['内向', 0], ['外向', 1]] },
             { key: 'guardian_b_ft', text: '监护人B 决策倾向', showIf: { key: 'single_parent', val: 0 }, options: [['感性', 0], ['理性', 1]] },
-            { key: 'life_satisfaction', text: '过去半年生活满意度', options: [
+            { key: 'life_satisfaction', text: '过去一年（下同）生活满意度', options: [
                 ['很不满意', 1], ['不满意', 2], ['基本满意', 3], ['满意', 4], ['非常满意', 5]
             ]},
             { key: 'life_meaning', text: '人生意义明确程度', options: [
                 ['非常迷茫', 1], ['迷茫', 2], ['若隐若现', 3], ['明确', 4], ['非常明确', 5]
             ]},
-            { key: 'education', text: '你的最高学历（第一学历）', options: [
+            { key: 'education', text: '你的第一学历（本科学历）', options: [
                 ['中专/职高', 1], ['大专/高职', 2], ['民办本科', 3], ['公办普通本科', 4],
                 ['潜力大学(普通211/新晋双一流)', 5], ['重点大学(普通985/顶流211)', 6],
                 ['顶尖大学(顶流985/C9/QS前100)', 7]
