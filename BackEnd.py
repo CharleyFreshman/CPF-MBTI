@@ -17,8 +17,13 @@ MODEL_NAMES = ['KNN', '逻辑回归', '朴素贝叶斯', '决策树']
 TYPE_LETTERS = {'I/E': ('I', 'E'), 'N/S': ('N', 'S'), 'F/T': ('F', 'T'), 'P/J': ('P', 'J')}
 
 
-def _safe_label(label: str) -> str:
+def safer(label: str) -> str:
     return label.replace('/', '_')
+
+
+def calc_weight(mean: float, std: float, eps: float = 1e-3) -> float:
+    """风险调整加权：同时考虑均值与方差，score = mean - std，保证泛化稳定性"""
+    return max(mean - std, eps)
 
 
 def train_all_models(X, y_dict, save_dir):
@@ -41,22 +46,21 @@ def train_all_models(X, y_dict, save_dir):
     tag = os.path.basename(save_dir.rstrip('/'))
 
     for label, y in y_dict.items():
-        print(f"\n{'='*5}\n[{tag}] 训练标签: {label}\n{'='*5}")
+        print(f"{'='*5} [{tag}] 训练标签: {label}{'='*5}")
         model_info[label] = {}
         for model_name, model in models.items():
-            print(f"训练 {model_name}...")
             cv_scores = cross_val_score(model, X_scaled, y, cv=5, scoring='accuracy')
             mean_score, std_score = cv_scores.mean(), cv_scores.std()
-            print(f"  CV准确率: {mean_score:.4f} (±{std_score:.4f})")
+            print(f"{model_name} 准确率: {mean_score:.4f} (±{std_score:.4f})")
             cv_results.loc[model_name, f'{label}_acc'] = mean_score
             cv_results.loc[model_name, f'{label}_std'] = std_score
             model.fit(X_scaled, y)
-            joblib.dump(model, f'{save_dir}/{model_name}_{_safe_label(label)}.pkl')
+            joblib.dump(model, f'{save_dir}/{model_name}_{safer(label)}.pkl')
             model_info[label][model_name] = {'cv_mean': mean_score, 'cv_std': std_score}
 
     cv_results.to_csv(f'{save_dir}/cv_scores.csv')
     joblib.dump(model_info, f'{save_dir}/model_info.pkl')
-    print(f"\n[{tag}] 训练完成\n{cv_results}")
+    print(f"[{tag}] 训练结果：{cv_results}")
     return cv_results, model_info
 
 
@@ -79,19 +83,21 @@ class _ModelSet:
         for label in LABEL_NAMES:
             self.models[label], self.weights[label] = {}, {}
             for model_name in MODEL_NAMES:
-                path = f'{self.model_dir}/{model_name}_{_safe_label(label)}.pkl'
+                path = f'{self.model_dir}/{model_name}_{safer(label)}.pkl'
                 if os.path.exists(path):
                     self.models[label][model_name] = joblib.load(path)
-                    w = float(cv_scores.loc[model_name, f'{label}_acc'])
+                    # 均值-方差均衡加权：惩罚高方差（不稳定）模型
+                    w = calc_weight(float(cv_scores.loc[model_name, f'{label}_acc']),
+                                    float(cv_scores.loc[model_name, f'{label}_std']))
                     self.weights[label][model_name] = w
-                    print(f"  {model_name} - {label}: 权重={w:.4f}")
                 else:
-                    print(f"  警告: {path} 不存在")
+                    print(f" 警告: {path} 不存在")
             total = sum(self.weights[label].values())
             if total > 0:
-                for m in self.weights[label]:
-                    self.weights[label][m] /= total
-
+                for m_n in self.weights[label]:
+                    self.weights[label][m_n] /= total
+                    print(f" {label}-{m_n}权重: {self.weights[label][m_n]:.4f}")
+        
     def preprocess_input(self, user_data: Union[List, np.ndarray, Dict]) -> np.ndarray:
         if isinstance(user_data, dict):
             data = [user_data.get(f'q{i}', 0) for i in range(1, len(self.feature_names) + 1)]
@@ -115,12 +121,12 @@ class _ModelSet:
         weights = np.array(weights)
         weighted_prob = float(np.sum(np.array(probas) * weights))
         pred = int(weighted_prob >= 0.5)
-        names = list(self.models[label].keys())
+        m_name = list(self.models[label].keys())
         return {
             'prediction': pred,
             'probability': weighted_prob,
-            'all_probas': {names[i]: probas[i] for i in range(len(names))},
-            'weights': {names[i]: float(weights[i]) for i in range(len(names))},
+            'all_probas': {m_name[i]: probas[i] for i in range(len(m_name))},
+            'weights': {m_name[i]: float(weights[i]) for i in range(len(m_name))},
         }
 
     def predict_all(self, user_data: Union[List, np.ndarray, Dict]) -> Dict:
@@ -191,6 +197,6 @@ if __name__ == "__main__":
             ms = p.single_parent if sp else p.two_parent
             feat = [int(np.random.randint(0, 4)) for _ in range(len(ms.feature_names))]
             r = p.get_formatted_result(feat, single_parent=sp)
-            print(f"\n[{name}] MBTI: {r['mbti_type']}  置信度: {r['confidence']:.4f}  特征数: {len(ms.feature_names)}")
+            print(f"[{name}] MBTI: {r['mbti_type']}  置信度: {r['confidence']:.4f}  特征数: {len(ms.feature_names)}")
     else:
         print("用法: python BackEnd.py [train|predict]")
